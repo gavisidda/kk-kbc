@@ -1147,7 +1147,10 @@ function selectAnswer(chosen) {
 
   // Speak feedback
   if (state.soundOn) {
-    setTimeout(() => speakText(correct ? u.right : u.wrongMsg(correctAnswerText), lang), 400);
+    const speechText = correct
+    ? u.rightMsg(correctAnswerText)
+    : u.wrongMsg(correctAnswerText);
+    setTimeout(() => speakText(speechText, lang), 400);
   }
 
   document.getElementById('nextBtn').style.display = 'inline-block';
