@@ -12,12 +12,13 @@
 
   // ⚠️ REPLACE WITH YOUR FIREBASE CONFIG
   const firebaseConfig = {
-    apiKey: "AIzaSyCz_ZATlZ0yu8DhaGssQHXHgvgr9fJE78c",
-    authDomain: "kk-kbc.firebaseapp.com",
-    projectId: "kk-kbc",
-    storageBucket: "kk-kbc.firebasestorage.app",
-    messagingSenderId: "450567950277",
-    appId: "1:450567950277:web:71b9478a17f341766c45ac"
+  apiKey: "AIzaSyCz_ZATlZ0yu8DhaGssQHXHgvgr9fJE78c",
+  authDomain: "kk-kbc.firebaseapp.com",
+  projectId: "kk-kbc",
+  storageBucket: "kk-kbc.firebasestorage.app",
+  messagingSenderId: "450567950277",
+  appId: "1:450567950277:web:71b9478a17f341766c45ac",
+  measurementId: "G-ZPSGV8J48E"
   };
 
   try {
@@ -1484,92 +1485,41 @@ function selectAnswer(chosen) {
   if (state.answered) return;
   state.answered = true;
 
-  const cat = state.activeCat;
-  const li = state.activeLevel;
-  const qi = state.qIndex;
-
+  const cat = state.activeCat, li = state.activeLevel, qi = state.qIndex;
   const q = QUESTIONS[cat][li][qi];
-  const lang = state.lang;
-  const lc = lang === 'kn' ? 'kannada' : lang === 'hi' ? 'hindi' : '';
+  const lang = state.lang, lc = lang==='kn'?'kannada':lang==='hi'?'hindi':'';
   const u = UI[lang];
-
   const correct = q.ans === chosen;
 
-  // Disable only current question buttons
-  const optionsContainer = document.getElementById('optionsContainer');
-  if (optionsContainer) {
-    optionsContainer.querySelectorAll('.option-btn')
-      .forEach(btn => btn.disabled = true);
-  }
-
-  // Highlight correct and chosen answers safely
-  const correctEl = document.getElementById('opt-' + q.ans);
-  if (correctEl) correctEl.classList.add('correct');
-
-  if (!correct) {
-    const chosenEl = document.getElementById('opt-' + chosen);
-    if (chosenEl) chosenEl.classList.add('wrong');
-  }
+  document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+  document.getElementById('opt-'+q.ans).classList.add('correct');
+  if (!correct) document.getElementById('opt-'+chosen).classList.add('wrong');
 
   const banner = document.getElementById('feedbackBanner');
-  const icon = document.getElementById('feedbackIcon');
-  const label = document.getElementById('feedbackLabel');
-  const msgEl = document.getElementById('feedbackMsg');
-
   const correctAnswerText = q.opts[lang][q.ans];
-
-  // Prepare messages
-  const speechMsg = correct
-    ? u.rightMsg(correctAnswerText)
-    : u.wrongMsg(correctAnswerText);
 
   if (correct) {
     banner.className = 'feedback-banner correct';
-    icon.textContent = '✅';
-    label.textContent = u.right;
-    msgEl.textContent = speechMsg;
-
-    state.score.correct++;
-    state.score.streak++;
-
-    // Trigger streak bonus only once at 3
-    if (state.score.streak === 3) {
-      showToast(u.streakBonus);
-    }
-
+    document.getElementById('feedbackIcon').textContent = '✅';
+    document.getElementById('feedbackLabel').textContent = u.right;
+    document.getElementById('feedbackMsg').textContent = u.rightMsg(correctAnswerText);
+    state.score.correct++; state.score.streak++;
+    if (state.score.streak >= 3) showToast(u.streakBonus);
     if (state.soundOn) playTone('correct');
-
-    // Safe level counter
-    state.levelCorrectCount = (state.levelCorrectCount || 0) + 1;
-
+    levelCorrectCount++;
   } else {
     banner.className = 'feedback-banner wrong';
-    icon.textContent = '❌';
-    label.textContent = u.wrong;
-    msgEl.textContent = speechMsg;
-
+    document.getElementById('feedbackIcon').textContent = '❌';
+    document.getElementById('feedbackLabel').textContent = u.wrong;
+    document.getElementById('feedbackMsg').textContent = u.wrongMsg(correctAnswerText);
     state.score.streak = 0;
-
     if (state.soundOn) playTone('wrong');
   }
+  banner.style.display = 'flex';
+  document.getElementById('feedbackMsg').className = 'msg ' + lc;
+  if (state.soundOn) setTimeout(() => speakText(correct ? u.right : u.wrongMsg(correctAnswerText), lang), 400);
 
-  // Show banner
-  if (banner) banner.style.display = 'flex';
-
-  // Apply language class safely
-  if (msgEl) msgEl.className = 'msg ' + lc;
-
-  // Speak after UI updates (smoother timing)
-  if (state.soundOn) {
-    requestAnimationFrame(() => {
-      setTimeout(() => speakText(speechMsg, lang), 300);
-    });
-  }
-
-  // Show next button
-  const nextBtn = document.getElementById('nextBtn');
-  if (nextBtn) nextBtn.style.display = 'inline-block';
-
+  document.getElementById('nextBtn').style.display = 'inline-block';
   updateScoreStrip();
   saveSession();
 }
@@ -1677,149 +1627,48 @@ function showToast(msg) {
 // ════════════════════════════════════════════
 // SOUND
 // ════════════════════════════════════════════
-// ════════════════════════════════════════════
-// GLOBAL STATE CHECK (keep yours if already defined)
-// ════════════════════════════════════════════
-//const state = window.state || { soundOn: true };
-
-
-// ════════════════════════════════════════════
-// VOICE LOADING (IMPORTANT FIX)
-// ════════════════════════════════════════════
-let voicesReady = false;
-
-function loadVoices() {
-  return new Promise(resolve => {
-    const voices = speechSynthesis.getVoices();
-    if (voices.length) {
-      voicesReady = true;
-      return resolve(voices);
-    }
-
-    speechSynthesis.onvoiceschanged = () => {
-      voicesReady = true;
-      resolve(speechSynthesis.getVoices());
-    };
-  });
-}
-
-
-// ════════════════════════════════════════════
-// GET BEST INDIAN VOICE
-// ════════════════════════════════════════════
-function getBestVoice(lang) {
-  const voices = speechSynthesis.getVoices();
-
-  const map = {
-    hi: ["hi-IN", "Hindi", "Google हिन्दी"],
-    ta: ["ta-IN", "Tamil"],
-    kn: ["kn-IN", "Kannada"],
-    en: ["en-IN", "India", "Indian", "Google UK English"]
-  };
-
-  const prefs = map[lang] || map.en;
-
-  // 1. Exact language match
-  let voice = voices.find(v => v.lang === prefs[0]);
-
-  // 2. Name match (Google voices sound best)
-  if (!voice) {
-    voice = voices.find(v =>
-      prefs.some(p => v.name.toLowerCase().includes(p.toLowerCase()))
-    );
-  }
-
-  // 3. Any Indian voice fallback
-  if (!voice) {
-    voice = voices.find(v => v.lang.includes("IN"));
-  }
-
-  return voice || voices[0];
-}
-
-
-// ════════════════════════════════════════════
-// MAIN SPEAK FUNCTION (IMPROVED)
-// ════════════════════════════════════════════
-async function speakText(text, lang = "en") {
+function speakText(text, lang) {
   if (!state.soundOn || !window.speechSynthesis) return;
-
-  if (!voicesReady) {
-    await loadVoices();
-  }
-
-  speechSynthesis.cancel();
-
-  const utter = new SpeechSynthesisUtterance(text);
-  const voice = getBestVoice(lang);
-
-  if (voice) utter.voice = voice;
-
-  utter.lang =
-    lang === "hi" ? "hi-IN" :
-    lang === "ta" ? "ta-IN" :
-    lang === "kn" ? "kn-IN" :
-    "en-IN";
-
-  // 🎯 Tuned for Indian clarity
-  utter.rate = 0.9;
-  utter.pitch = 1;
-  utter.volume = 1;
-
-  speechSynthesis.speak(utter);
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang==='kn'?'kn-IN':lang==='hi'?'hi-IN':'en-IN';
+  u.rate = 0.9; u.pitch = 1; u.volume = 0.9;
+  window.speechSynthesis.speak(u);
 }
 
-
-// ════════════════════════════════════════════
-// IMPROVED SOUND EFFECTS
-// ════════════════════════════════════════════
 function playTone(type) {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-
-    const play = (freq, start, duration, vol = 0.25) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.frequency.value = freq;
-
-      gain.gain.setValueAtTime(vol, ctx.currentTime + start);
-      gain.gain.exponentialRampToValueAtTime(
-        0.001,
-        ctx.currentTime + start + duration
-      );
-
-      osc.start(ctx.currentTime + start);
-      osc.stop(ctx.currentTime + start + duration);
-    };
-
-    if (type === "correct") {
-      play(523, 0, 0.2);
-      play(659, 0.15, 0.2);
-      play(784, 0.3, 0.3);
-    }
-
-    else if (type === "wrong") {
-      play(220, 0, 0.3);
-      play(180, 0.2, 0.3);
-    }
-
-    else if (type === "win") {
-      [523, 659, 784, 1047].forEach((f, i) => {
-        play(f, i * 0.12, 0.25);
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    if (type==='correct') {
+      osc.frequency.setValueAtTime(523,ctx.currentTime);
+      osc.frequency.setValueAtTime(659,ctx.currentTime+0.1);
+      osc.frequency.setValueAtTime(784,ctx.currentTime+0.2);
+      gain.gain.setValueAtTime(0.3,ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.5);
+      osc.start(); osc.stop(ctx.currentTime+0.5);
+    } else if (type==='wrong') {
+      osc.frequency.setValueAtTime(220,ctx.currentTime);
+      osc.frequency.setValueAtTime(180,ctx.currentTime+0.15);
+      gain.gain.setValueAtTime(0.3,ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4);
+      osc.start(); osc.stop(ctx.currentTime+0.4);
+    } else if (type==='win') {
+      [523,659,784,1047].forEach((f,i)=>{
+        const o2=ctx.createOscillator(),g2=ctx.createGain();
+        o2.connect(g2);g2.connect(ctx.destination);
+        o2.frequency.value=f; g2.gain.setValueAtTime(0.2,ctx.currentTime+i*0.12);
+        g2.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+i*0.12+0.3);
+        o2.start(ctx.currentTime+i*0.12); o2.stop(ctx.currentTime+i*0.12+0.3);
       });
+    } else {
+      osc.frequency.value=150;
+      gain.gain.setValueAtTime(0.2,ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.6);
+      osc.start(); osc.stop(ctx.currentTime+0.6);
     }
-
-    else {
-      play(150, 0, 0.5);
-    }
-
-  } catch (e) {
-    console.warn("Audio error:", e);
-  }
+  } catch(e){}
 }
 
 // ════════════════════════════════════════════
@@ -1839,238 +1688,150 @@ async function updateFirebaseScore() {
 }
 
 // ════════════════════════════════════════════
-// BASIC HASH (simple protection, not crypto-grade)
-// ════════════════════════════════════════════
-function hash(str) {
-  return btoa(unescape(encodeURIComponent(str)));
-}
-
-
-// ════════════════════════════════════════════
-// ADMIN LOGIN UI
+// ADMIN DASHBOARD
 // ════════════════════════════════════════════
 function showAdminLogin() {
   document.getElementById('adminLoginOverlay').classList.add('show');
   document.getElementById('adminLoginErr').style.display = 'none';
 }
 
-
-// ════════════════════════════════════════════
-// LOGIN LOGIC (IMPROVED)
-// ════════════════════════════════════════════
 function adminLogin() {
   const user = document.getElementById('adminUser').value.trim();
   const pwd  = document.getElementById('adminPwd').value;
+  const savedPwd = localStorage.getItem(ADMIN_PWD_KEY) || DEFAULT_ADMIN.pwd;
 
-  if (!user || !pwd) {
-    showError('⚠️ Enter username & password');
-    return;
-  }
-
-  const savedHash =
-    localStorage.getItem(ADMIN_PWD_KEY) ||
-    hash(DEFAULT_ADMIN.pwd);
-
-  if (user === DEFAULT_ADMIN.user && hash(pwd) === savedHash) {
+  if (user === DEFAULT_ADMIN.user && pwd === savedPwd) {
     document.getElementById('adminLoginOverlay').classList.remove('show');
     document.getElementById('splash').style.display = 'none';
     document.getElementById('app').style.display = 'none';
     document.getElementById('adminApp').style.display = 'flex';
-
     loadParticipants();
   } else {
-    showError('❌ Invalid credentials');
+    document.getElementById('adminLoginErr').style.display = 'block';
   }
 }
 
-
-// ════════════════════════════════════════════
-// LOGOUT (SMOOTHER)
-// ════════════════════════════════════════════
 function adminLogout() {
   document.getElementById('adminApp').style.display = 'none';
-
+  // Return to quiz if session active, else splash
   if (localStorage.getItem(SESSION_KEY)) {
-    document.getElementById('app').style.display = 'flex';
+    location.reload();
   } else {
     document.getElementById('splash').style.display = 'flex';
   }
 }
 
-
-// ════════════════════════════════════════════
-// ERROR HANDLER
-// ════════════════════════════════════════════
-function showError(msg) {
-  const el = document.getElementById('adminLoginErr');
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-
-
-// ════════════════════════════════════════════
-// TABS
-// ════════════════════════════════════════════
 function adminTab(name) {
-  document.querySelectorAll('.admin-section')
-    .forEach(s => s.classList.remove('active'));
-
-  document.getElementById('tab-' + name)
-    .classList.add('active');
-
-  document.querySelectorAll('.admin-nav-btn')
-    .forEach((b, i) => {
-      b.classList.toggle(
-        'active',
-        ['participants','settings','guide'][i] === name
-      );
-    });
-
+  document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.admin-nav-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['participants','settings','guide'][i] === name);
+  });
   if (name === 'participants') loadParticipants();
 }
 
-
-// ════════════════════════════════════════════
-// LOAD PARTICIPANTS
-// ════════════════════════════════════════════
 async function loadParticipants() {
   const tbody = document.getElementById('participantsBody');
+  tbody.innerHTML = '<tr><td colspan="7"><div class="spinner"></div></td></tr>';
 
-  tbody.innerHTML =
-    '<tr><td colspan="7"><div class="spinner"></div></td></tr>';
-
-  // 🔁 Demo mode clean fallback
   if (!window._db || !window._fbModules) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">⚠️ Firebase not configured. Configure your Firebase credentials to see live participant data.<br><br>For now showing demo data.</div></td></tr>';
+    // Show demo stats
     renderDemoParticipants();
-    showToast('ℹ️ Demo mode (Firebase not connected)');
     return;
   }
 
   try {
     const { collection, getDocs, query, orderBy } = window._fbModules;
-
-    const q = query(
-      collection(window._db, 'quiz_participants'),
-      orderBy('startedAt', 'desc')
-    );
-
+    const q = query(collection(window._db,'quiz_participants'), orderBy('startedAt','desc'));
     const snap = await getDocs(q);
     const rows = [];
-
     snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
-
     renderParticipants(rows);
-
-  } catch (e) {
-    tbody.innerHTML =
-      `<tr><td colspan="7"><div class="empty-state">
-        ⚠️ Failed to load data<br>${e.message}
-      </div></td></tr>`;
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">Error loading data: ${e.message}</div></td></tr>`;
   }
 }
 
-
-// ════════════════════════════════════════════
-// DEMO DATA
-// ════════════════════════════════════════════
 function renderDemoParticipants() {
   const demo = [
-    { name:'Gavi Hatti', language:'kn', totalCorrect:45, totalWon:350000, startedAt:new Date() },
-    { name:'Rajesh Kumar', language:'hi', totalCorrect:38, totalWon:280000, startedAt:new Date(Date.now()-86400000) },
-    { name:'Priya Sharma', language:'en', totalCorrect:50, totalWon:480000, startedAt:new Date(Date.now()-172800000) },
-    { name:'Arun Koppal', language:'kn', totalCorrect:22, totalWon:120000, startedAt:new Date(Date.now()-259200000) },
+    { name:'Gavi Hatti', language:'kn', totalCorrect:45, totalWon:350000, startedAt:{toDate:()=>new Date()} },
+    { name:'Rajesh Kumar', language:'hi', totalCorrect:38, totalWon:280000, startedAt:{toDate:()=>new Date(Date.now()-86400000)} },
+    { name:'Priya Sharma', language:'en', totalCorrect:50, totalWon:480000, startedAt:{toDate:()=>new Date(Date.now()-172800000)} },
+    { name:'Arun Koppal', language:'kn', totalCorrect:22, totalWon:120000, startedAt:{toDate:()=>new Date(Date.now()-259200000)} },
   ];
-
   renderParticipants(demo);
 }
 
-
-// ════════════════════════════════════════════
-// RENDER TABLE
-// ════════════════════════════════════════════
 function renderParticipants(rows) {
-  const tbody = document.getElementById('participantsBody');
-
-  if (!rows.length) {
-    tbody.innerHTML =
-      '<tr><td colspan="7"><div class="empty-state">No participants yet</div></td></tr>';
+  if (rows.length === 0) {
+    document.getElementById('participantsBody').innerHTML =
+      '<tr><td colspan="7"><div class="empty-state">No participants yet. Share the quiz link to get started!</div></td></tr>';
+    document.getElementById('stat-total').textContent = '0';
+    document.getElementById('stat-top').textContent = '0';
+    document.getElementById('stat-avg').textContent = '0';
+    document.getElementById('stat-lang').textContent = '—';
     return;
   }
 
-  const maxScore = Math.max(...rows.map(r => r.totalCorrect || 0), 1);
+  const totalP = rows.length;
+  const topScore = Math.max(...rows.map(r=>r.totalCorrect||0));
+  const avgCorrect = Math.round(rows.reduce((a,r)=>a+(r.totalCorrect||0),0)/totalP);
+  const langCount = {};
+  rows.forEach(r => { langCount[r.language] = (langCount[r.language]||0)+1; });
+  const topLang = Object.entries(langCount).sort((a,b)=>b[1]-a[1])[0];
 
-  tbody.innerHTML = rows.map((r, i) => {
-    const pct = Math.round((r.totalCorrect || 0) / maxScore * 100);
+  document.getElementById('stat-total').textContent = totalP;
+  document.getElementById('stat-top').textContent = topScore;
+  document.getElementById('stat-avg').textContent = avgCorrect;
+  document.getElementById('stat-lang').textContent = topLang ? ({en:'English',kn:'ಕನ್ನಡ',hi:'हिंदी'}[topLang[0]]||topLang[0]) : '—';
 
-    const date = r.startedAt?.toDate
-      ? r.startedAt.toDate()
-      : new Date(r.startedAt);
-
-    return `
-      <tr>
-        <td>${i+1}</td>
-        <td>${r.name || '—'}</td>
-        <td>${(r.language || 'en').toUpperCase()}</td>
-        <td>${r.totalCorrect || 0}</td>
-        <td>₹${(r.totalWon || 0).toLocaleString('en-IN')}</td>
-        <td>${pct}%</td>
-        <td>${date.toLocaleDateString('en-IN')}</td>
-      </tr>
-    `;
+  const maxScore = Math.max(topScore, 1);
+  document.getElementById('participantsBody').innerHTML = rows.map((r,i) => {
+    const pct = Math.round((r.totalCorrect||0)/maxScore*100);
+    const dateStr = r.startedAt?.toDate ? r.startedAt.toDate().toLocaleDateString('en-IN') : (r.startedAt ? new Date(r.startedAt).toLocaleDateString('en-IN') : '—');
+    const langMap = {en:'EN',kn:'KN',hi:'HI'};
+    return `<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td style="font-weight:600">${r.name||'—'}</td>
+      <td><span class="badge-lang ${r.language||'en'}">${langMap[r.language]||'EN'}</span></td>
+      <td>${r.totalCorrect||0}</td>
+      <td style="color:var(--gold);font-family:'Cinzel',serif">₹${(r.totalWon||0).toLocaleString('en-IN')}</td>
+      <td>
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-bar-fill" style="width:${pct}%"></div></div>
+          <span style="font-size:.75rem;color:var(--muted)">${pct}%</span>
+        </div>
+      </td>
+      <td style="color:var(--muted);font-size:.8rem">${dateStr}</td>
+    </tr>`;
   }).join('');
 }
 
-// ════════════════════════════════════════════
-// SETTINGS
-// ════════════════════════════════════════════
 function saveSettings() {
   const t = document.getElementById('set-threshold').value;
   const l = document.getElementById('set-lang').value;
-
-  localStorage.setItem(
-    'kqp_settings',
-    JSON.stringify({ threshold: t / 100, defaultLang: l })
-  );
-
-  showToast('✅ Settings saved');
+  localStorage.setItem('kqp_settings', JSON.stringify({ threshold: t/100, defaultLang: l }));
+  showToast('✅ Settings saved!');
 }
 
-// ════════════════════════════════════════════
-// PASSWORD CHANGE (HASHED)
-// ════════════════════════════════════════════
 function changeAdminPassword() {
   const old = document.getElementById('set-oldpwd').value;
   const nw  = document.getElementById('set-newpwd').value;
-
-  const savedHash =
-    localStorage.getItem(ADMIN_PWD_KEY) ||
-    hash(DEFAULT_ADMIN.pwd);
-
-  if (hash(old) !== savedHash) {
-    showToast('❌ Wrong current password');
-    return;
-  }
-
-  if (nw.length < 4) {
-    showToast('❌ Min 4 characters');
-    return;
-  }
-
-  localStorage.setItem(ADMIN_PWD_KEY, hash(nw));
-
-  showToast('✅ Password updated');
+  const savedPwd = localStorage.getItem(ADMIN_PWD_KEY) || DEFAULT_ADMIN.pwd;
+  if (old !== savedPwd) { showToast('❌ Current password incorrect'); return; }
+  if (nw.length < 4) { showToast('❌ Password too short (min 4 chars)'); return; }
+  localStorage.setItem(ADMIN_PWD_KEY, nw);
+  document.getElementById('set-oldpwd').value = '';
+  document.getElementById('set-newpwd').value = '';
+  showToast('✅ Password changed!');
 }
 
-// ════════════════════════════════════════════
-// RESET PROGRESS (FIXED BUG)
-// ════════════════════════════════════════════
 function resetAllProgress() {
-  if (!confirm('Reset ALL progress?')) return;
-
+  if (!confirm('Reset ALL local player progress? This cannot be undone.')) return;
   localStorage.removeItem(STATUS_KEY);
   localStorage.removeItem(SESSION_KEY);
-
-  showToast('✅ Progress cleared');
+  showToast('✅ All progress cleared');
 }
 </script>
 </body>
